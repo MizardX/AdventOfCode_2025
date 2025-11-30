@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "./target/aoc/aoc-autobuild"
+		}
+	],
+	"settings": {
+		"files.restoreUndoStack": false,
+		"github.copilot.enable": {
+			"rust": false
+		},
+		"rust-analyzer.assist.preferSelf": true,
+		"rust-analyzer.check.command": "clippy",
+		"rust-analyzer.imports.granularity.group": "module",
+		"workbench.editor.restoreViewState": false,
+		"workbench.startupEditor": "none",
+		"editor.colorDecorators": false
+	}
+}
