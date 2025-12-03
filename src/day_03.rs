@@ -2,13 +2,7 @@
 fn part_1(input: &str) -> u64 {
     let mut res = 0;
     for line in input.lines() {
-        let mut max_before = 0;
-        let mut max_val = 0;
-        for ch in line.bytes() {
-            max_val = max_val.max(max_before * 10 + (ch - b'0'));
-            max_before = max_before.max(ch - b'0');
-        }
-        res += u64::from(max_val);
+        res += find_max_joltage(line.as_bytes(), 2);
     }
     res
 }
@@ -16,29 +10,33 @@ fn part_1(input: &str) -> u64 {
 #[aoc(day3, part2)]
 fn part_2(input: &str) -> u64 {
     let mut res = 0;
-    let mut digits = Vec::new();
     for line in input.lines() {
-        digits.clear();
-        for ch in line.bytes() {
+        res += find_max_joltage(line.as_bytes(), 12);
+    }
+    res
+}
+
+fn find_max_joltage(batteries: &[u8], count: usize) -> u64 {
+    let mut value = 0;
+    let mut start = 0;
+    let len = batteries.len();
+    for end in len - count + 1..=len {
+        let mut max_digit = 0;
+        let mut max_pos = 0;
+        for (i, &ch) in batteries[start..end].iter().enumerate() {
             let dig = ch - b'0';
-            digits.push(dig);
-            if digits.len() > 12 {
-                let mut found_lt = false;
-                for (i, (d1, d2)) in digits.iter().zip(digits.iter().skip(1)).enumerate() {
-                    if d1 < d2 {
-                        found_lt = true;
-                        digits.remove(i);
-                        break;
-                    }
-                }
-                if !found_lt {
-                    digits.pop();
+            if dig > max_digit {
+                max_digit = dig;
+                max_pos = start + i;
+                if max_digit == 9 {
+                    break;
                 }
             }
         }
-        res += digits.iter().copied().fold(0, |s, d| s * 10 + u64::from(d));
+        value = 10 * value + u64::from(max_digit);
+        start = max_pos + 1;
     }
-    res
+    value
 }
 
 #[cfg(test)]
