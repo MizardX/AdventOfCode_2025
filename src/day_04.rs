@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
@@ -133,23 +133,33 @@ fn part_1(grid: &Grid<Tile>) -> usize {
 #[aoc(day4, part2)]
 fn part_2(grid: &Grid<Tile>) -> usize {
     let mut removed = HashSet::<Pos>::new();
-    let mut any_change = true;
-    while any_change {
-        any_change = false;
-        for r in 0..grid.height {
-            for c in 0..grid.width {
-                let pos = Pos::new(r, c);
-                if grid[pos] != Tile::Roll || removed.contains(&pos) {
-                    continue;
-                }
-                let neighbors = grid
-                    .neighbors(pos)
-                    .filter(|&n| grid[n] == Tile::Roll && !removed.contains(&n))
-                    .count();
-                if neighbors < 4 {
-                    removed.insert(pos);
-                    any_change = true;
-                }
+    let mut pending = VecDeque::<Pos>::new();
+    for r in 0..grid.height {
+        for c in 0..grid.width {
+            let pos = Pos::new(r, c);
+            if grid[pos] != Tile::Roll {
+                continue;
+            }
+            let neighbors = grid
+                .neighbors(pos)
+                .filter(|&n| grid[n] == Tile::Roll)
+                .count();
+            if neighbors < 4 && removed.insert(pos) {
+                pending.push_back(pos);
+            }
+        }
+    }
+    while let Some(pos) = pending.pop_front() {
+        for next in grid.neighbors(pos) {
+            if grid[next] != Tile::Roll {
+                continue;
+            }
+            let neighbors = grid
+                .neighbors(next)
+                .filter(|&n| grid[n] == Tile::Roll && !removed.contains(&n))
+                .count();
+            if neighbors < 4 && removed.insert(next) {
+                pending.push_back(next);
             }
         }
     }
