@@ -1,112 +1,117 @@
-use std::num::ParseIntError;
+use std::ops::Index;
+use std::str::FromStr;
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-enum ParseError {
-    #[error("Syntax error")]
-    SyntaxError,
-    #[error(transparent)]
-    InvalidNumber(#[from] ParseIntError),
+#[derive(Debug, Clone)]
+struct Grid {
+    data: Vec<u8>,
+    width: usize,
+    height: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Operator {
-    Mul,
-    Add,
-}
-
-impl Operator {
-    const fn unit(self) -> u64 {
-        match self {
-            Self::Mul => 1,
-            Self::Add => 0,
+impl Grid {
+    const fn get_index(&self, (row, col): (usize, usize)) -> Option<usize> {
+        if row < self.height || col < self.width {
+            Some(row * self.width + col)
+        } else {
+            None
         }
     }
 }
 
-impl TryFrom<u8> for Operator {
-    type Error = ParseError;
+impl Index<(usize, usize)> for Grid {
+    type Output = u8;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            b'*' => Self::Mul,
-            b'+' => Self::Add,
-            _ => return Err(ParseError::SyntaxError),
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.data[self.get_index(index).expect("index out of range")]
+    }
+}
+
+impl FromStr for Grid {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let height = s.lines().count();
+        let width = s.lines().next().unwrap_or_default().len();
+        let mut data = Vec::with_capacity(width * height);
+        for line in s.lines() {
+            data.extend_from_slice(line.as_bytes());
+        }
+        Ok(Self {
+            data,
+            width,
+            height,
         })
     }
+}
+
+#[aoc_generator(day6)]
+fn parse(input: &str) -> Grid {
+    input.parse().unwrap()
 }
 
 #[aoc(day6, part1)]
-fn part_1(input: &str) -> u64 {
-    let mut lines: Vec<_> = input.lines().collect();
-    let ops = lines
-        .pop()
-        .unwrap()
-        .split_ascii_whitespace()
-        .map(|op| {
-            let &[ch] = op.as_bytes() else {
-                return Err(ParseError::SyntaxError);
-            };
-            Operator::try_from(ch)
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-    let mut results = ops.iter().map(|op| op.unit()).collect::<Vec<_>>();
-    for line in lines {
-        for ((res, op), num) in results
-            .iter_mut()
-            .zip(&ops)
-            .zip(line.split_ascii_whitespace())
-        {
-            let num = num.parse::<u64>().unwrap();
-            match op {
-                Operator::Mul => *res *= num,
-                Operator::Add => *res += num,
-            }
-        }
-    }
-    results.into_iter().sum()
-}
-
-#[aoc(day6, part2)]
-fn part_2(input: &str) -> u64 {
-    let mut lines = input.lines().collect::<Vec<_>>();
-    let op_line = lines.pop().unwrap();
-    let mut ops = op_line
-        .match_indices(['*', '+'])
-        .map(|(ix, s)| {
-            let &[ch] = s.as_bytes() else {
-                return Err(ParseError::SyntaxError);
-            };
-            let op: Operator = ch.try_into()?;
-            Ok((op, (ix..(ix + 1))))
-        })
-        .collect::<Result<Vec<_>, ParseError>>()
-        .unwrap();
-    let mut end = op_line.len();
-    for (_, rng) in ops.iter_mut().rev() {
-        *rng = rng.start..end;
-        end = rng.start;
-    }
+fn part_1(grid: &Grid) -> u64 {
+    let mut right = grid.width;
+    let bottom = grid.height - 1;
     let mut total_sum = 0;
-    for &(op, ref rng) in &ops {
-        let mut res = op.unit();
-        for ix in rng.clone() {
-            let num = lines
-                .iter()
-                .map(|l| l.as_bytes()[ix])
-                .filter(|&ch| ch != b' ')
-                .fold(0, |val, dig| val * 10 + u64::from(dig - b'0'));
-            if num == 0 {
-                continue;
-            }
-            match op {
-                Operator::Mul => res *= num,
-                Operator::Add => res += num,
+    for left in (0..grid.width).rev() {
+        let mut res = match grid[(bottom, left)] {
+            b'*' => 1,
+            b'+' => 0,
+            _ => continue,
+        };
+        for r in 0..bottom {
+            let num = (left..right).fold(0, |val, c| {
+                let ch = grid[(r, c)];
+                if ch == b' ' {
+                    val
+                } else {
+                    val * 10 + u64::from(ch - b'0')
+                }
+            });
+            match grid[(bottom, left)] {
+                b'*' => res *= num,
+                b'+' => res += num,
+                _ => unreachable!(),
             }
         }
         total_sum += res;
+        right = left;
+    }
+    total_sum
+}
+
+#[aoc(day6, part2)]
+fn part_2(grid: &Grid) -> u64 {
+    let mut right = grid.width;
+    let bottom = grid.height - 1;
+    let mut total_sum = 0;
+    for left in (0..grid.width).rev() {
+        let mut res = match grid[(bottom, left)] {
+            b'*' => 1,
+            b'+' => 0,
+            _ => continue,
+        };
+        for c in left..right {
+            let num = (0..bottom).fold(0, |val, r| {
+                let ch = grid[(r, c)];
+                if ch == b' ' {
+                    val
+                } else {
+                    val * 10 + u64::from(ch - b'0')
+                }
+            });
+            if num == 0 {
+                continue;
+            }
+            match grid[(bottom, left)] {
+                b'*' => res *= num,
+                b'+' => res += num,
+                _ => unreachable!(),
+            }
+        }
+        total_sum += res;
+        right = left;
     }
     total_sum
 }
@@ -119,13 +124,15 @@ mod tests {
 
     #[test]
     fn test_part_1() {
-        let res = part_1(EXAMPLE1);
+        let grid = parse(EXAMPLE1);
+        let res = part_1(&grid);
         assert_eq!(res, 4_277_556);
     }
 
     #[test]
     fn test_part_2() {
-        let res = part_2(EXAMPLE1);
+        let grid = parse(EXAMPLE1);
+        let res = part_2(&grid);
         assert_eq!(res, 3_263_827);
     }
 }
