@@ -1,5 +1,3 @@
-use std::collections::{HashMap, VecDeque};
-
 use thiserror::Error;
 
 use crate::shared::{Grid, Pos};
@@ -52,53 +50,34 @@ fn simulate(grid: &Grid<Tile>) -> (u64, u64) {
         .find(|&pos| grid[pos] == Tile::Start)
         .expect("'S' in first row");
 
-    let mut pending = VecDeque::new();
-    pending.push_back(start);
+    let mut pending = vec![0; grid.width()];
+    pending[start.col] = 1;
 
-    let mut timelines = HashMap::new();
-    timelines.insert(start, 1);
+    let mut next = vec![0; grid.width()];
 
-    let mut num_timelines = 0;
     let mut num_splits = 0;
 
-    while let Some(pos) = pending.pop_front() {
-        let multitude = *timelines.get(&pos).unwrap();
-        match grid[pos] {
-            Tile::Empty | Tile::Start => {
-                if pos.row + 2 < grid.height() {
-                    let below = Pos::new(pos.row + 2, pos.col);
-                    *timelines.entry(below).or_insert_with(|| {
-                        pending.push_back(below);
-                        0
-                    }) += multitude;
-                } else {
-                    num_timelines += multitude;
-                }
+    for row in (0..grid.width()).step_by(2) {
+        for (col, &multitude) in pending.iter().enumerate() {
+            if multitude == 0 {
+                continue;
             }
-            Tile::Splitter => {
-                num_splits += 1;
-                // Add the row below, as to not make the frontline jagged
-                if pos.row + 2 < grid.height() {
-                    if pos.col > 0 {
-                        let left = Pos::new(pos.row + 2, pos.col - 1);
-                        *timelines.entry(left).or_insert_with(|| {
-                            pending.push_back(left);
-                            0
-                        }) += multitude;
-                    }
-                    if pos.col + 1 < grid.width() {
-                        let right = Pos::new(pos.row + 2, pos.col + 1);
-                        *timelines.entry(right).or_insert_with(|| {
-                            pending.push_back(right);
-                            0
-                        }) += multitude;
-                    }
-                } else {
-                    num_timelines += 2 * multitude;
+            let pos = Pos::new(row, col);
+            match grid[pos] {
+                Tile::Empty | Tile::Start => {
+                    next[pos.col] += multitude;
+                }
+                Tile::Splitter => {
+                    num_splits += 1;
+                    next[pos.col - 1] += multitude;
+                    next[pos.col + 1] += multitude;
                 }
             }
         }
+        (pending, next) = (next, pending);
+        next.fill(0);
     }
+    let num_timelines = pending.into_iter().sum();
     (num_splits, num_timelines)
 }
 
