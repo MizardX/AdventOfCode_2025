@@ -65,8 +65,8 @@ fn simulate(grid: &Grid<Tile>) -> (u64, u64) {
         let multitude = *timelines.get(&pos).unwrap();
         match grid[pos] {
             Tile::Empty | Tile::Start => {
-                if pos.row + 1 < grid.height() {
-                    let below = Pos::new(pos.row + 1, pos.col);
+                if pos.row + 2 < grid.height() {
+                    let below = Pos::new(pos.row + 2, pos.col);
                     *timelines.entry(below).or_insert_with(|| {
                         pending.push_back(below);
                         0
@@ -78,19 +78,23 @@ fn simulate(grid: &Grid<Tile>) -> (u64, u64) {
             Tile::Splitter => {
                 num_splits += 1;
                 // Add the row below, as to not make the frontline jagged
-                if pos.col > 0 {
-                    let left = Pos::new(pos.row + 1, pos.col - 1);
-                    *timelines.entry(left).or_insert_with(|| {
-                        pending.push_back(left);
-                        0
-                    }) += multitude;
-                }
-                if pos.col + 1 < grid.width() {
-                    let right = Pos::new(pos.row + 1, pos.col + 1);
-                    *timelines.entry(right).or_insert_with(|| {
-                        pending.push_back(right);
-                        0
-                    }) += multitude;
+                if pos.row + 2 < grid.height() {
+                    if pos.col > 0 {
+                        let left = Pos::new(pos.row + 2, pos.col - 1);
+                        *timelines.entry(left).or_insert_with(|| {
+                            pending.push_back(left);
+                            0
+                        }) += multitude;
+                    }
+                    if pos.col + 1 < grid.width() {
+                        let right = Pos::new(pos.row + 2, pos.col + 1);
+                        *timelines.entry(right).or_insert_with(|| {
+                            pending.push_back(right);
+                            0
+                        }) += multitude;
+                    }
+                } else {
+                    num_timelines += 2 * multitude;
                 }
             }
         }
