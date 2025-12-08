@@ -72,22 +72,18 @@ fn part_2(points: &[Point]) -> u64 {
     last_connection(points)
 }
 
-fn groups_after_connecting(points: &[Point], mut connections: usize) -> u64 {
+fn groups_after_connecting(points: &[Point], connections: usize) -> u64 {
     let mut pairs = Vec::new();
     for (i, p1) in points.iter().enumerate() {
         for (j, p2) in points[..i].iter().enumerate() {
             let dist_sq = p1.dist_sq(*p2);
-            pairs.push((Reverse(dist_sq), j, i));
+            pairs.push((dist_sq, j, i));
         }
     }
-    let mut heap = BinaryHeap::<_>::from(pairs);
+    let (small, _, _) = pairs.select_nth_unstable(connections);
     let mut uf = UnionFind::new(points.len());
-    while let Some((_, i, j)) = heap.pop() {
+    for &(_, i, j) in small.iter() {
         uf.union(i, j);
-        connections -= 1;
-        if connections == 0 {
-            break;
-        }
     }
     let mut sizes = uf.roots().map(|(_, s)| s).collect::<Vec<_>>();
     sizes.sort_unstable();
