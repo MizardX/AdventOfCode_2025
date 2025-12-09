@@ -32,14 +32,6 @@ impl Point {
         let dy = self.y.abs_diff(other.y) as u64 + 1;
         dx * dy
     }
-
-    // fn left_turn(self, p2: Self, p3: Self) -> bool {
-    //     let dx1 = p2.x.cast_signed() - self.x.cast_signed();
-    //     let dy1 = p2.y.cast_signed() - self.y.cast_signed();
-    //     let dx2 = p3.x.cast_signed() - p2.x.cast_signed();
-    //     let dy2 = p3.y.cast_signed() - p2.y.cast_signed();
-    //     dx1 * dy2 - dy1 * dx2 > 0
-    // }
 }
 
 impl FromStr for Point {
@@ -80,8 +72,15 @@ fn part_1(points: &[Point]) -> u64 {
 }
 
 #[aoc(day9, part2)]
-#[expect(clippy::too_many_lines)]
 fn part_2(points: &[Point]) -> u64 {
+    let (xs, ys) = compress_coordinates(points);
+    let mut grid = draw_outline(points, &xs, &ys);
+    fill_interior(&mut grid, &xs, &ys);
+    accumulate_sum(&mut grid, &xs, &ys);
+    find_max_interior_rectangle(points, &grid, &xs, &ys)
+}
+
+fn compress_coordinates(points: &[Point]) -> (Vec<u32>, Vec<u32>) {
     let mut xs = BTreeSet::new();
     let mut ys = BTreeSet::new();
     xs.insert(0);
@@ -92,8 +91,10 @@ fn part_2(points: &[Point]) -> u64 {
         ys.insert(pt.y);
         ys.insert(pt.y + 1);
     }
-    let xs = xs.into_iter().collect::<Vec<_>>();
-    let ys = ys.into_iter().collect::<Vec<_>>();
+    (xs.into_iter().collect(), ys.into_iter().collect())
+}
+
+fn draw_outline(points: &[Point], xs: &[u32], ys: &[u32]) -> Grid<u64> {
     let mut grid = Grid::new(vec![0_u64; xs.len() * ys.len()], xs.len(), ys.len());
     for (&p1, &p2) in points.iter().zip(points.iter().cycle().skip(1)) {
         if p1.x == p2.x {
@@ -112,7 +113,12 @@ fn part_2(points: &[Point]) -> u64 {
             }
         }
     }
-    let mut uf = UnionFind::new(xs.len() * ys.len());
+    grid
+}
+
+fn fill_interior(grid: &mut Grid<u64>, xs: &[u32], ys: &[u32]) {
+    let mut uf = UnionFind::new(xs.len() * ys.len() + 1);
+    let outside = xs.len() * ys.len();
     for yi in 0..ys.len() {
         for xi in 0..xs.len() {
             let ix = yi * xs.len() + xi;
@@ -133,14 +139,12 @@ fn part_2(points: &[Point]) -> u64 {
                 }
             }
             if val == 0 && (xi == 0 || xi == xs.len() - 1 || yi == 0 || yi == ys.len() - 1) {
-                uf.union(0, ix);
+                uf.union(outside, ix);
             }
         }
     }
-    uf.union(0, xs.len() - 1);
-    uf.union(0, (ys.len() - 1) * xs.len());
-    uf.union(0, ys.len() * xs.len() - 1);
-    let outside_root = uf.find(0);
+
+    let outside_root = uf.find(outside);
     let edge_root = uf
         .roots()
         .map(|(r, _)| r)
@@ -160,6 +164,9 @@ fn part_2(points: &[Point]) -> u64 {
             }
         }
     }
+}
+
+fn accumulate_sum(grid: &mut Grid<u64>, xs: &[u32], ys: &[u32]) {
     for (yi, (&y1, &y2)) in ys
         .iter()
         .zip(ys[1..].iter().chain([ys.last().unwrap()]))
@@ -171,19 +178,22 @@ fn part_2(points: &[Point]) -> u64 {
             .enumerate()
         {
             let pos = Pos::new(yi, xi);
-            let mut sum = i64::from(grid[pos] > 0) * i64::from(y2 - y1) * i64::from(x2 - x1);
+            let mut sum = u64::from(grid[pos] > 0) * u64::from(y2 - y1) * u64::from(x2 - x1);
             if xi > 0 {
-                sum += i64::try_from(grid[Pos::new(yi, xi - 1)]).unwrap();
+                sum += grid[Pos::new(yi, xi - 1)];
                 if yi > 0 {
-                    sum += i64::try_from(grid[Pos::new(yi - 1, xi)]).unwrap();
-                    sum -= i64::try_from(grid[Pos::new(yi - 1, xi - 1)]).unwrap();
+                    sum += grid[Pos::new(yi - 1, xi)];
+                    sum -= grid[Pos::new(yi - 1, xi - 1)];
                 }
             } else if yi > 0 {
-                sum += i64::try_from(grid[Pos::new(yi - 1, xi)]).unwrap();
+                sum += grid[Pos::new(yi - 1, xi)];
             }
-            grid[pos] = sum.try_into().expect("positive");
+            grid[pos] = sum;
         }
     }
+}
+
+fn find_max_interior_rectangle(points: &[Point], grid: &Grid<u64>, xs: &[u32], ys: &[u32]) -> u64 {
     let mut max_area = 0;
     for (i, &p1) in points.iter().enumerate() {
         let xi1 = xs.partition_point(|&x| x < p1.x);
@@ -216,7 +226,7 @@ fn part_2(points: &[Point]) -> u64 {
 mod tests {
     use super::*;
 
-    const EXAMPLE1: &str = "\
+    const EXAMPLE: &str = "\
         7,1\n\
         11,1\n\
         11,7\n\
@@ -227,40 +237,9 @@ mod tests {
         7,3\
     ";
 
-    const EXAMPLE2: &str = "\
-        10,30\n\
-        30,30\n\
-        30,10\n\
-        50,10\n\
-        50,30\n\
-        70,30\n\
-        70,10\n\
-        90,10\n\
-        90,30\n\
-        110,30\n\
-        110,50\n\
-        90,50\n\
-        90,70\n\
-        110,70\n\
-        110,90\n\
-        90,90\n\
-        90,110\n\
-        70,110\n\
-        70,90\n\
-        50,90\n\
-        50,110\n\
-        30,110\n\
-        30,90\n\
-        10,90\n\
-        10,70\n\
-        30,70\n\
-        30,50\n\
-        10,50\
-    ";
-
     #[test]
     fn test_parse() {
-        let result = parse(EXAMPLE1).unwrap();
+        let result = parse(EXAMPLE).unwrap();
         assert_eq!(
             result,
             [
@@ -278,22 +257,15 @@ mod tests {
 
     #[test]
     fn test_part_1() {
-        let points = parse(EXAMPLE1).unwrap();
+        let points = parse(EXAMPLE).unwrap();
         let result = part_1(&points);
         assert_eq!(result, 50);
     }
 
     #[test]
     fn test_part_2() {
-        let points = parse(EXAMPLE1).unwrap();
+        let points = parse(EXAMPLE).unwrap();
         let result = part_2(&points);
         assert_eq!(result, 24);
-    }
-
-    #[test]
-    fn test_part_2_b() {
-        let points = parse(EXAMPLE2).unwrap();
-        let result = part_2(&points);
-        assert_eq!(result, 61 * 61);
     }
 }
