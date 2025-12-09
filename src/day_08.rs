@@ -6,6 +6,8 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
+use crate::shared::UnionFind;
+
 #[derive(Debug, Error)]
 enum ParseError {
     #[error("Syntax error")]
@@ -114,90 +116,6 @@ fn last_connection(points: &[Point]) -> u64 {
     }
     let (i, j) = last_union.expect("At least one union");
     u64::from(points[i].x) * u64::from(points[j].x)
-}
-
-#[derive(Debug, Clone, Copy)]
-struct UFNode {
-    parent: usize,
-    size: usize,
-}
-
-#[derive(Debug, Clone)]
-struct UnionFind {
-    nodes: Vec<UFNode>,
-    num_roots: usize,
-}
-
-impl UnionFind {
-    fn new(size: usize) -> Self {
-        let nodes = (0..size).map(|parent| UFNode { parent, size: 1 }).collect();
-        Self {
-            nodes,
-            num_roots: size,
-        }
-    }
-
-    fn find(&mut self, mut index: usize) -> usize {
-        let mut parent = self.nodes[index].parent;
-        while index != parent {
-            let grand_parent = self.nodes[parent].parent;
-            self.nodes[index].parent = grand_parent;
-            index = grand_parent;
-            parent = self.nodes[index].parent;
-        }
-        index
-    }
-
-    fn union(&mut self, mut index1: usize, mut index2: usize) -> bool {
-        index1 = self.find(index1);
-        index2 = self.find(index2);
-        if index1 == index2 {
-            return false;
-        }
-        if self.nodes[index1].size < self.nodes[index2].size {
-            (index1, index2) = (index2, index1);
-        }
-        self.nodes[index2].parent = index1;
-        self.nodes[index1].size += self.nodes[index2].size;
-        self.num_roots -= 1;
-        true
-    }
-
-    fn roots(&self) -> impl Iterator<Item = (usize, usize)> {
-        self.nodes
-            .iter()
-            .enumerate()
-            .filter_map(|(ix, n)| (n.parent == ix).then_some((ix, n.size)))
-    }
-
-    const fn num_roots(&self) -> usize {
-        self.num_roots
-    }
-}
-
-impl Display for UnionFind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut sizes = self.roots().map(|(_, s)| s).collect::<Vec<_>>();
-        sizes.sort_unstable();
-        let mut fmt_list = f.debug_list();
-        let mut last = 0;
-        let mut count = 0;
-        for &size in sizes.iter().rev() {
-            if size == last {
-                count += 1;
-            } else {
-                if count > 0 {
-                    fmt_list.entry(&(last, count));
-                }
-                last = size;
-                count = 1;
-            }
-        }
-        if count > 0 {
-            fmt_list.entry(&(last, count));
-        }
-        fmt_list.finish()
-    }
 }
 
 #[cfg(test)]
