@@ -64,23 +64,27 @@ fn parse(input: &str) -> Result<Vec<Machine>, ParseError> {
 fn part_1(machines: &[Machine]) -> u64 {
     let mut sum = 0;
     for machine in machines {
-        let mut minimal = u32::MAX;
-        for mask in 0..(1_u16 << machine.buttons.len()) {
-            let num_active = mask.count_ones();
-            let remaining_indicators = machine
-                .buttons
-                .iter()
-                .enumerate()
-                .filter(|(ix, _)| mask & (1 << ix) != 0)
-                .fold(machine.indicator_lights, |m, (_, &b)| m ^ b);
-            if remaining_indicators == 0 {
-                minimal = minimal.min(num_active);
-            }
-        }
-        assert!(minimal != u32::MAX, "No solution: {machine:?}");
-        sum += u64::from(minimal);
+        sum += activation_buttons(machine.indicator_lights, &machine.buttons)
+            .expect("No solution found");
     }
     sum
+}
+
+fn activation_buttons(indicator_lights: u16, buttons: &[u16]) -> Option<u64> {
+    let mut minimal = u32::MAX;
+    for mask in 0..(1_u16 << buttons.len()) {
+        let num_active = mask.count_ones();
+        if num_active >= minimal { continue; }
+        let remaining_indicators = buttons
+            .iter()
+            .enumerate()
+            .filter(|(ix, _)| mask & (1 << ix) != 0)
+            .fold(indicator_lights, |m, (_, &b)| m ^ b);
+        if remaining_indicators == 0 {
+            minimal = minimal.min(num_active);
+        }
+    }
+    (minimal != u32::MAX).then_some(u64::from(minimal))
 }
 
 #[aoc(day10, part2)]
