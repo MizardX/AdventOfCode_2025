@@ -12,46 +12,6 @@ enum ParseError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Tile {
-    id: u8,
-    shape: [u8; 3],
-}
-
-impl FromStr for Tile {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // 0:
-        // ###
-        // ##.
-        // ##.
-        let mut lines = s.lines();
-        let id = lines
-            .next()
-            .ok_or(ParseError::SyntaxError)?
-            .strip_suffix(':')
-            .ok_or(ParseError::SyntaxError)?
-            .parse()?;
-        let shape = [
-            lines.next().ok_or(ParseError::SyntaxError)?,
-            lines.next().ok_or(ParseError::SyntaxError)?,
-            lines.next().ok_or(ParseError::SyntaxError)?,
-        ]
-        .map(|l| {
-            l.bytes().fold(0, |s, ch| {
-                // '.' = 0b00101110, '#' = 0b00100011
-                // so `ch & 1` turns it into `0` or `1`
-                (s << 1) | (ch & 1)
-            })
-        });
-        if lines.next().is_some() {
-            return Err(ParseError::SyntaxError);
-        }
-        Ok(Self { id, shape })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Region {
     width: u8,
     height: u8,
@@ -90,7 +50,6 @@ impl FromStr for Region {
 
 #[derive(Debug, Clone)]
 struct Input {
-    tiles: [Tile; 6],
     regions: Vec<Region>,
 }
 
@@ -99,16 +58,8 @@ impl FromStr for Input {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split("\n\n");
-        let tiles = [
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-            parts.next().ok_or(ParseError::SyntaxError)?.parse()?,
-        ];
         let regions = parts
-            .next()
+            .nth(6) // Skip tiles
             .ok_or(ParseError::SyntaxError)?
             .lines()
             .map(str::parse)
@@ -116,7 +67,7 @@ impl FromStr for Input {
         if parts.next().is_some() {
             return Err(ParseError::SyntaxError);
         }
-        Ok(Self { tiles, regions })
+        Ok(Self { regions })
     }
 }
 
@@ -127,20 +78,12 @@ fn parse(input: &str) -> Result<Input, ParseError> {
 
 #[aoc(day12, part1)]
 fn part_1(input: &Input) -> usize {
-    let tile_areas = input
-        .tiles
-        .map(|t| t.shape.iter().map(|row| row.count_ones()).sum::<u32>());
     input
         .regions
         .iter()
         .filter(|r| {
             let total_area = u64::from(r.width) * u64::from(r.height);
-            let sum_shapes_area = r
-                .quantities
-                .iter()
-                .zip(&tile_areas)
-                .map(|(&q, &a)| u64::from(q) * u64::from(a))
-                .sum();
+            let sum_shapes_area = r.quantities.iter().map(|&c| u64::from(c)).sum::<u64>() * 9;
             total_area >= sum_shapes_area
         })
         .count()
@@ -189,13 +132,6 @@ mod tests {
     #[test]
     fn test_parse() {
         let input = parse(EXAMPLE).unwrap();
-        assert_eq!(
-            input.tiles[0],
-            Tile {
-                id: 0,
-                shape: [0b111, 0b110, 0b110]
-            }
-        );
         assert_eq!(input.regions.len(), 3);
         assert_eq!(
             input.regions[0],
